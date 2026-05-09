@@ -919,25 +919,55 @@ function updateTrackingUI(on){
 }
 
 function startSendingLocation(){
-  if(techWatchId) navigator.geolocation.clearWatch(techWatchId);
   const key = CURRENT_USER.techName.replace(/\s+/g,'_');
+
+  const sendToFirebase = (lat, lng) => {
+    const payload = {
+      lat, lng,
+      name: CURRENT_USER.techName,
+      ts: Date.now(),
+      active: true
+    };
+    fetch(`${FB_URL}/locations/${key}.json`, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    }).catch(()=>{});
+    document.getElementById('trackingStatus').textContent =
+      '🟢 Aktif — ' + new Date().toLocaleTimeString('id-ID');
+  };
+
+  // Coba pakai Capacitor Background Geolocation dulu
+  if(window.Capacitor && window.Capacitor.isNativePlatform &&
+     window.Capacitor.isNativePlatform() &&
+     window.CapacitorCommunity && window.CapacitorCommunity.BackgroundGeolocation){
+
+    const BGGeo = window.CapacitorCommunity.BackgroundGeolocation;
+    BGGeo.addWatcher({
+      backgroundMessage: 'Dispatch Today sedang melacak lokasi kamu.',
+      backgroundTitle: 'Tracking Aktif',
+      requestPermissions: true,
+      stale: false,
+      distanceFilter: 10 // update tiap gerak 10 meter
+    }, (loc, err) => {
+      if(err){ console.warn('BGGeo error:', err); return; }
+      sendToFirebase(loc.latitude, loc.longitude);
+    }).then(id => { techWatchId = id; })
+      .catch(err => {
+        console.warn('BGGeo failed, fallback ke browser GPS:', err);
+        startBrowserGPS(sendToFirebase);
+      });
+
+  } else {
+    // Fallback: browser GPS biasa
+    startBrowserGPS(sendToFirebase);
+  }
+}
+
+function startBrowserGPS(sendToFirebase){
+  if(techWatchId) navigator.geolocation.clearWatch(techWatchId);
   techWatchId = navigator.geolocation.watchPosition(
-    pos => {
-      const payload = {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        name: CURRENT_USER.techName,
-        ts: Date.now(),
-        active: true
-      };
-      fetch(`${FB_URL}/locations/${key}.json`, {
-        method: 'PUT',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(payload)
-      }).catch(()=>{});
-      document.getElementById('trackingStatus').textContent =
-        '🟢 Aktif — ' + new Date().toLocaleTimeString('id-ID');
-    },
+    pos => sendToFirebase(pos.coords.latitude, pos.coords.longitude),
     err => {
       document.getElementById('trackingStatus').textContent = '⚠ GPS error: ' + err.message;
     },
@@ -946,8 +976,20 @@ function startSendingLocation(){
 }
 
 function stopSendingLocation(){
-  if(techWatchId){ navigator.geolocation.clearWatch(techWatchId); techWatchId = null; }
   const key = CURRENT_USER.techName.replace(/\s+/g,'_');
+
+  // Stop Capacitor BGGeo kalau aktif
+  if(window.Capacitor && window.Capacitor.isNativePlatform &&
+     window.Capacitor.isNativePlatform() &&
+     window.CapacitorCommunity && window.CapacitorCommunity.BackgroundGeolocation &&
+     techWatchId && typeof techWatchId === 'string'){
+    window.CapacitorCommunity.BackgroundGeolocation.removeWatcher({ id: techWatchId })
+      .catch(()=>{});
+  } else if(techWatchId){
+    navigator.geolocation.clearWatch(techWatchId);
+  }
+  techWatchId = null;
+
   fetch(`${FB_URL}/locations/${key}.json`, {
     method: 'PATCH',
     headers: {'Content-Type':'application/json'},
