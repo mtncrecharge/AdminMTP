@@ -433,6 +433,10 @@ function doLogin(){
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('userAvatar').textContent = name.charAt(0).toUpperCase();
   document.getElementById('userName').textContent = name;
+  // Langsung sembunyiin filter teknisi & lokasi kalau role tech
+  if(CURRENT_USER.role === 'tech'){
+    document.getElementById('rowTechLoc').style.display = 'none';
+  }
   // Cek status tracking dari Firebase
   if(CURRENT_USER.role==='tech') checkTrackingStatus();
   loadData();
