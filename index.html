@@ -320,7 +320,7 @@ td.nc{white-space:normal;line-height:1.3;}
         <div class="user-avatar" id="userAvatar">?</div>
         <div class="user-name" id="userName">...</div>
       </div>
-      <button class="btnr" onclick="loadData()">⟳</button>
+      <button class="btnr" onclick="mapInitialFit=false;loadData(true)">⟳</button>
     </div>
   </div>
   <!-- Tracking bar - hanya muncul untuk teknisi -->
@@ -466,7 +466,7 @@ function parseCSV(t){
 }
 
 // ── Load data ──
-async function loadData(){
+async function loadData(force=false){
   // Kalau role tech dan belum ON, skip load dispatch
   if(CURRENT_USER && CURRENT_USER.role==='tech' && !isTracking){
     document.getElementById('rtime').textContent='—';
@@ -496,18 +496,17 @@ async function loadData(){
         };
       });
 
-    // Guard: kalau hasil parse jauh lebih sedikit dari data sebelumnya
-    // kemungkinan Sheets lagi refresh/kosong sementara — skip update
-    if(DATA.length > 0 && parsed.length < DATA.length * 0.5){
-      document.getElementById('rtime').textContent='⏳ Sheets refresh...';
-      return;
-    }
-
-    // Guard: kalau mayoritas status kosong, skip juga
-    const emptyStatus = parsed.filter(r=>!r.status).length;
-    if(parsed.length > 0 && emptyStatus > parsed.length * 0.5){
-      document.getElementById('rtime').textContent='⏳ Sheets refresh...';
-      return;
+    // Guard hanya berlaku untuk auto-refresh, bukan manual reload
+    if(!force){
+      if(DATA.length > 0 && parsed.length < DATA.length * 0.5){
+        document.getElementById('rtime').textContent='⏳ Sheets refresh...';
+        return;
+      }
+      const emptyStatus = parsed.filter(r=>!r.status).length;
+      if(parsed.length > 0 && emptyStatus > parsed.length * 0.5){
+        document.getElementById('rtime').textContent='⏳ Sheets refresh...';
+        return;
+      }
     }
 
     // Data valid, update
