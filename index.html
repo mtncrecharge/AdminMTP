@@ -641,7 +641,6 @@ function applyFilter(){
     {l:'Total', v:FILTERED.length,c:'var(--primary)'},
     {l:'Open',  v:op,  c:'var(--red)'},
     {l:'Done',  v:dn,  c:'var(--green)'},
-    {l:'Prog',  v:prog,c:'var(--yellow)'},
     ...catCards,
   ].map(x=>`<div class="sc"><div class="sc-l">${x.l}</div><div class="sc-v" style="color:${x.c}">${x.v}</div></div>`).join('');
 
