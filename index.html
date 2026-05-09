@@ -955,15 +955,22 @@ function stopSendingLocation(){
   }).catch(()=>{});
 }
 
-function startTracking(){
+async function startTracking(){
   if(!navigator.geolocation){
     alert('Browser tidak support GPS'); return;
   }
   isTracking = true;
   updateTrackingUI(true);
   startSendingLocation();
-  // Reload data so dispatch list shows
-  loadData();
+  // Reload data + render map langsung
+  await loadData(true);
+  if(!mapReady){
+    loadLeaflet(()=>{ initMap(); });
+  } else {
+    renderMap();
+  }
+  if(mapReady) fetchTechLocations();
+  setTimeout(()=>{ if(mapReady) fetchTechLocations(); }, 3000);
 }
 
 function stopTracking(){
