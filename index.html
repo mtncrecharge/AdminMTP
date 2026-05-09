@@ -430,22 +430,26 @@ function doLogin(){
     return;
   }
   CURRENT_USER = { name, ...user };
+  // Simpan session ke localStorage biar persist walau force close
+  localStorage.setItem('dispatch_session', JSON.stringify({ name, pass }));
+  applyLogin();
+}
+
+function applyLogin(){
   document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('userAvatar').textContent = name.charAt(0).toUpperCase();
-  document.getElementById('userName').textContent = name;
-  // Langsung sembunyiin filter teknisi & lokasi kalau role tech
+  document.getElementById('userAvatar').textContent = CURRENT_USER.name.charAt(0).toUpperCase();
+  document.getElementById('userName').textContent = CURRENT_USER.name;
   if(CURRENT_USER.role === 'tech'){
     document.getElementById('rowTechLoc').style.display = 'none';
   }
-  // Cek status tracking dari Firebase
   if(CURRENT_USER.role==='tech') checkTrackingStatus();
   loadData();
 }
 
 function doLogout(){
   if(!confirm('Logout dari akun ' + CURRENT_USER.name + '?')) return;
-  // Stop tracking kalau masih ON
   if(isTracking) stopTracking();
+  localStorage.removeItem('dispatch_session');
   CURRENT_USER = null;
   DATA=[]; FILTERED=[];
   document.getElementById('loginName').value = '';
@@ -835,8 +839,19 @@ const obs=new IntersectionObserver(entries=>{
 },{threshold:0.1});
 obs.observe(document.getElementById('map'));
 
-// Start
+// Start — restore session kalau ada
 setInterval(()=>{if(CURRENT_USER)loadData();},30*1000);
+(function restoreSession(){
+  try{
+    const saved = localStorage.getItem('dispatch_session');
+    if(!saved) return;
+    const { name, pass } = JSON.parse(saved);
+    const user = USERS[name];
+    if(!user || user.pass !== pass){ localStorage.removeItem('dispatch_session'); return; }
+    CURRENT_USER = { name, ...user };
+    applyLogin();
+  } catch(e){ localStorage.removeItem('dispatch_session'); }
+})();
 
 // ── Realtime tech markers on map ──
 let techWatchId = null;
@@ -888,6 +903,14 @@ async function checkTrackingStatus(){
       isTracking = true;
       updateTrackingUI(true);
       startSendingLocation();
+      // Langsung load data + map karena tracking masih aktif
+      await loadData(true);
+      if(!mapReady){
+        loadLeaflet(()=>{ initMap(); });
+      } else {
+        renderMap();
+      }
+      if(mapReady) fetchTechLocations();
     } else {
       isTracking = false;
       updateTrackingUI(false);
@@ -896,7 +919,6 @@ async function checkTrackingStatus(){
     isTracking = false;
     updateTrackingUI(false);
   }
-  // Show tracking bar for tech
   document.getElementById('trackingBar').style.display = 'block';
 }
 
