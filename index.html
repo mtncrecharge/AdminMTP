@@ -780,6 +780,7 @@ function initMap(){
   renderMap();
 }
 
+let mapInitialFit = false;
 function renderMap(){
   if(!map||!markerLayer)return;
   // Bikin layer baru dulu, jangan langsung clear yang lama
@@ -800,13 +801,15 @@ function renderMap(){
         ${r.ops?`<a href="${r.ops}" target="_blank" class="pu-btn" style="background:rgba(34,197,94,0.2);color:#22c55e">⚡ Ops</a>`:''}
       </div>`,{maxWidth:240}).addTo(newLayer);
   });
-  // Swap layer lama dengan yang baru — tidak ada kedip
+  // Swap layer — hapus lama, pasang baru
   map.removeLayer(markerLayer);
-  newLayer.addTo(map);
   markerLayer = newLayer;
-  if(pts.length){
+  markerLayer.addTo(map);
+  // fitBounds hanya sekali saat pertama kali ada data
+  if(pts.length && !mapInitialFit){
     const b=L.latLngBounds(pts.map(r=>[r.lat,r.lng]));
     map.fitBounds(b,{padding:[20,20]});
+    mapInitialFit = true;
   }
   // Overlay tech realtime markers
   fetchTechLocations();
@@ -836,19 +839,21 @@ setInterval(()=>{if(CURRENT_USER)loadData();},30*1000);
 let techWatchId = null;
 let realtimeInterval = null;
 
+let techLayer = null;
 async function fetchTechLocations(){
   // Hanya admin yang bisa lihat lokasi teknisi
   if(!CURRENT_USER || CURRENT_USER.role !== 'admin') return;
+  if(!map) return;
   try{
     const res = await fetch(FB_URL + '/locations.json?t=' + Date.now());
     const data = await res.json();
-    if(!data || !map) return;
-    // Bikin layer baru untuk tech markers
-    const newTechLayer = L.layerGroup();
+    // Hapus layer lama kalau ada
+    if(techLayer){ try{map.removeLayer(techLayer);}catch(e){} }
+    techLayer = L.layerGroup().addTo(map);
+    if(!data) return;
     const now = Date.now();
     Object.entries(data).forEach(([techKey, val]) => {
-      if(!val || !val.lat || !val.lng) return;
-      if(!val.active) return;
+      if(!val || !val.lat || !val.lng || !val.active) return;
       const age = now - (val.ts || 0);
       const fresh = age < 10 * 60 * 1000;
       const color = fresh ? '#00e676' : '#f59e0b';
@@ -865,14 +870,8 @@ async function fetchTechLocations(){
         .bindPopup(`<div class="pu-id">📍 ${val.name||techKey}</div>
           <div class="pu-row">Status: <span style="color:${fresh?'#00e676':'#f59e0b'}">${fresh?'🟢 Aktif':'🟡 '+minAgo+'m lalu'}</span></div>
           <div class="pu-row">Update: <span>${new Date(val.ts||0).toLocaleTimeString('id-ID')}</span></div>`,{maxWidth:200})
-        .addTo(newTechLayer);
+        .addTo(techLayer);
     });
-    // Hapus layer lama, pasang yang baru
-    Object.values(techMarkers).forEach(m=>{ try{map.removeLayer(m);}catch(e){} });
-    techMarkers = {};
-    newTechLayer.addTo(map);
-    // Simpan referensi layer baru ke techMarkers untuk cleanup berikutnya
-    techMarkers['__layer__'] = newTechLayer;
   } catch(e){ console.warn('Fetch tech loc error:', e); }
 }
 
