@@ -709,8 +709,8 @@ function renderTable(){
           ${r.solution?`<div class="di"><div class="dl">Solution</div><div class="dv" style="white-space:normal">${r.solution}</div></div>`:''}
           <div class="dbtns">
             ${r.lat&&r.lng?`<button onclick="openMaps(${r.lat},${r.lng},event)" class="dbtn dbtn-map">🗺 Maps</button>`:''}
-            ${r.link?`<button onclick="window.open('${r.link}','_blank')" class="dbtn dbtn-form">📋 Form</button>`:''}
-            ${r.ops?`<button onclick="window.open('${r.ops}','_blank')" class="dbtn dbtn-ops">⚡ Ops</button>`:''}
+            ${r.link?`<button onclick="window.open(this.dataset.url,'_blank')" data-url="${r.link.replace(/"/g,'&quot;')}" class="dbtn dbtn-form">📋 Form</button>`:''}
+            ${r.ops?`<button onclick="window.open(this.dataset.url,'_blank')" data-url="${r.ops.replace(/"/g,'&quot;')}" class="dbtn dbtn-ops">⚡ Ops</button>`:''}
           </div>
         </div>
       </td>
