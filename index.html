@@ -686,6 +686,8 @@ function applyFilterNoMap(){
 
 // ── Apply filter ──
 function applyFilter(){
+  // Kalau routing aktif, skip — tabel dan map dikunci
+  if(isRouting) return;
   const s=document.getElementById('srch').value.toLowerCase();
   const st=document.getElementById('fStatus').value;
   const cat=document.getElementById('fCat').value;
@@ -875,6 +877,8 @@ let mapInitialFit = false;
 let isRenderingMap = false;
 function renderMap(){
   if(!map||!markerLayer)return;
+  // Kalau routing aktif, skip re-render map — posisi dikunci
+  if(isRouting) return;
   isRenderingMap = true;
   const newLayer = L.layerGroup();
   const pts=FILTERED.filter(r=>r.lat&&r.lng);
