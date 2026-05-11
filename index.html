@@ -1050,7 +1050,8 @@ async function startTracking(){
   }
   isTracking = true;
   updateTrackingUI(true);
-  // Ambil posisi GPS sekarang dulu sebelum load data
+  startSendingLocation();
+  // Tunggu GPS dapat posisi dulu, baru load data
   await new Promise(resolve => {
     navigator.geolocation.getCurrentPosition(
       pos => {
@@ -1058,11 +1059,10 @@ async function startTracking(){
         techCurrentLng = pos.coords.longitude;
         resolve();
       },
-      () => resolve(), // tetap lanjut walau GPS error
-      { enableHighAccuracy: true, timeout: 5000 }
+      () => resolve(),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
   });
-  startSendingLocation();
   // Reload data + render map langsung
   await loadData(true);
   if(!mapReady){
