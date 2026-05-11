@@ -608,6 +608,16 @@ function fillSel(id,vals){
   vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;if(v===cur)o.selected=true;s.appendChild(o);});
 }
 
+// ── Haversine distance (km) ──
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// Lokasi GPS teknisi terakhir untuk sorting
+let techCurrentLat=null, techCurrentLng=null;
+
 // ── Apply filter ──
 function applyFilter(){
   const s=document.getElementById('srch').value.toLowerCase();
@@ -622,6 +632,16 @@ function applyFilter(){
     const fst=st?normStatus(st):'';
     return ms&&(!st||rs===fst)&&(!cat||r.cat===cat)&&(!tech||r.tech===tech)&&(!loc||r.loc===loc);
   });
+
+  // Sort by jarak kalau teknisi lagi tracking dan GPS tersedia
+  if(CURRENT_USER && CURRENT_USER.role==='tech' && isTracking &&
+     techCurrentLat !== null && techCurrentLng !== null){
+    FILTERED.sort((a,b)=>{
+      const da=(a.lat&&a.lng)?haversine(techCurrentLat,techCurrentLng,a.lat,a.lng):99999;
+      const db=(b.lat&&b.lng)?haversine(techCurrentLat,techCurrentLng,b.lat,b.lng):99999;
+      return da-db;
+    });
+  }
 
   // Summary
   const op=FILTERED.filter(r=>normStatus(r.status)==='open').length;
@@ -943,6 +963,9 @@ function startSendingLocation(){
   const key = CURRENT_USER.techName.replace(/\s+/g,'_');
 
   const sendToFirebase = (lat, lng) => {
+    // Simpan koordinat terkini untuk sorting jarak
+    techCurrentLat = lat;
+    techCurrentLng = lng;
     const payload = {
       lat, lng,
       name: CURRENT_USER.techName,
@@ -1038,10 +1061,15 @@ async function startTracking(){
 
 function stopTracking(){
   isTracking = false;
+  techCurrentLat = null;
+  techCurrentLng = null;
   updateTrackingUI(false);
   stopSendingLocation();
-  // Reload data
   loadData();
+  // Sembunyiin tabel dan map saat stop
+  document.getElementById('twrap').style.display='none';
+  document.getElementById('summary').innerHTML='<div style="text-align:center;color:var(--muted);font-size:12px;padding:16px 0;">Tekan <b style="color:#00e676">▶ Mulai</b> untuk melihat dispatch kamu</div>';
+  document.getElementById('cnt').textContent='0 tiket';
 }
 
 function toggleTracking(){
