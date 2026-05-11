@@ -615,8 +615,8 @@ function haversine(lat1,lng1,lat2,lng2){
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-// Lokasi GPS teknisi terakhir untuk sorting
-let techCurrentLat=null, techCurrentLng=null;
+// Lokasi GPS teknisi saat klik Mulai (dikunci, tidak berubah)
+let techStartLat=null, techStartLng=null;
 
 // ── Apply filter ──
 function applyFilter(){
@@ -635,10 +635,10 @@ function applyFilter(){
 
   // Sort by jarak kalau teknisi lagi tracking dan GPS tersedia
   if(CURRENT_USER && CURRENT_USER.role==='tech' && isTracking &&
-     techCurrentLat !== null && techCurrentLng !== null){
+     techStartLat !== null && techStartLng !== null){
     FILTERED.sort((a,b)=>{
-      const da=(a.lat&&a.lng)?haversine(techCurrentLat,techCurrentLng,a.lat,a.lng):99999;
-      const db=(b.lat&&b.lng)?haversine(techCurrentLat,techCurrentLng,b.lat,b.lng):99999;
+      const da=(a.lat&&a.lng)?haversine(techStartLat,techStartLng,a.lat,a.lng):99999;
+      const db=(b.lat&&b.lng)?haversine(techStartLat,techStartLng,b.lat,b.lng):99999;
       return da-db;
     });
   }
@@ -964,11 +964,12 @@ function startSendingLocation(){
 
   const sendToFirebase = (lat, lng) => {
     // Simpan koordinat terkini untuk sorting jarak
-    const isFirst = techCurrentLat === null;
-    techCurrentLat = lat;
-    techCurrentLng = lng;
-    // Kalau ini posisi pertama, langsung re-sort tabel
-    if(isFirst) applyFilter();
+    const isFirst = techStartLat === null;
+    if(isFirst){
+      techStartLat = lat;
+      techStartLng = lng;
+      applyFilter();
+    }
     const payload = {
       lat, lng,
       name: CURRENT_USER.techName,
@@ -1055,8 +1056,8 @@ async function startTracking(){
   await new Promise(resolve => {
     navigator.geolocation.getCurrentPosition(
       pos => {
-        techCurrentLat = pos.coords.latitude;
-        techCurrentLng = pos.coords.longitude;
+        techStartLat = pos.coords.latitude;
+        techStartLng = pos.coords.longitude;
         resolve();
       },
       () => resolve(),
@@ -1076,8 +1077,8 @@ async function startTracking(){
 
 function stopTracking(){
   isTracking = false;
-  techCurrentLat = null;
-  techCurrentLng = null;
+  techStartLat = null;
+  techStartLng = null;
   updateTrackingUI(false);
   stopSendingLocation();
   loadData();
