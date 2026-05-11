@@ -627,7 +627,6 @@ let isRouting=false;
 function toggleRouting(){
   const btn = document.getElementById('routingBtn');
   if(isRouting){
-    // Matiin routing — balik urutan normal
     isRouting = false;
     techStartLat = null;
     techStartLng = null;
@@ -635,9 +634,9 @@ function toggleRouting(){
     btn.style.background = 'rgba(59,130,246,0.2)';
     btn.style.color = '#3b82f6';
     btn.style.borderColor = 'rgba(59,130,246,0.4)';
-    applyFilter();
+    // Cukup sort ulang tabel, ga perlu re-render map
+    applyFilterNoMap();
   } else {
-    // Nyalain routing — ambil GPS sekarang lalu sort
     btn.textContent = '⏳ GPS...';
     navigator.geolocation.getCurrentPosition(
       pos => {
@@ -648,7 +647,8 @@ function toggleRouting(){
         btn.style.background = 'rgba(0,230,118,0.15)';
         btn.style.color = '#00e676';
         btn.style.borderColor = 'rgba(0,230,118,0.4)';
-        applyFilter();
+        // Cukup sort ulang tabel, ga perlu re-render map
+        applyFilterNoMap();
       },
       () => {
         btn.textContent = '🧭 Routing';
@@ -657,6 +657,31 @@ function toggleRouting(){
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
   }
+}
+
+// applyFilter tanpa re-render map — untuk routing sort only
+function applyFilterNoMap(){
+  const s=document.getElementById('srch').value.toLowerCase();
+  const st=document.getElementById('fStatus').value;
+  const cat=document.getElementById('fCat').value;
+  const tech=document.getElementById('fTech')?document.getElementById('fTech').value:'';
+  const loc=document.getElementById('fLoc')?document.getElementById('fLoc').value:'';
+  FILTERED=DATA.filter(r=>{
+    const ms=!s||r.termName.toLowerCase().includes(s)||r.id.toLowerCase().includes(s)||r.tech.toLowerCase().includes(s)||r.termId.toLowerCase().includes(s);
+    const rs=normStatus(r.status);
+    const fst=st?normStatus(st):'';
+    return ms&&(!st||rs===fst)&&(!cat||r.cat===cat)&&(!tech||r.tech===tech)&&(!loc||r.loc===loc);
+  });
+  if(isRouting && techStartLat !== null && techStartLng !== null){
+    FILTERED.sort((a,b)=>{
+      const da=(a.lat&&a.lng)?haversine(techStartLat,techStartLng,a.lat,a.lng):99999;
+      const db=(b.lat&&b.lng)?haversine(techStartLat,techStartLng,b.lat,b.lng):99999;
+      return da-db;
+    });
+  }
+  document.getElementById('cnt').textContent=FILTERED.length+' tiket';
+  renderTable();
+  // Map tidak di-render ulang saat routing
 }
 
 // ── Apply filter ──
@@ -847,8 +872,10 @@ function initMap(){
 }
 
 let mapInitialFit = false;
+let isRenderingMap = false;
 function renderMap(){
   if(!map||!markerLayer)return;
+  isRenderingMap = true;
   const newLayer = L.layerGroup();
   const pts=FILTERED.filter(r=>r.lat&&r.lng);
   pts.forEach(r=>{
@@ -866,18 +893,16 @@ function renderMap(){
         ${r.ops?`<a href="${r.ops}" target="_blank" class="pu-btn" style="background:rgba(34,197,94,0.2);color:#22c55e">⚡ Ops</a>`:''}
       </div>`,{maxWidth:240}).addTo(newLayer);
   });
-  // Swap layer dispatch
   map.removeLayer(markerLayer);
   markerLayer = newLayer;
   markerLayer.addTo(map);
-  // fitBounds hanya sekali
   if(pts.length && !mapInitialFit){
     const b=L.latLngBounds(pts.map(r=>[r.lat,r.lng]));
     map.fitBounds(b,{padding:[20,20]});
     mapInitialFit = true;
   }
-  // Fetch tech markers setelah dispatch layer selesai dipasang
-  // Pakai setTimeout biar ga bentrok (race condition)
+  isRenderingMap = false;
+  // Fetch tech markers setelah dispatch layer selesai
   setTimeout(()=>{ if(CURRENT_USER) fetchTechLocations(); }, 200);
 }
 
@@ -924,10 +949,9 @@ let realtimeInterval = null;
 let techLayer = null;
 let isFetchingTech = false;
 async function fetchTechLocations(){
-  // Hanya admin yang bisa lihat lokasi teknisi
   if(!CURRENT_USER || CURRENT_USER.role !== 'admin') return;
   if(!map) return;
-  if(isFetchingTech) return; // skip kalau lagi fetch
+  if(isFetchingTech || isRenderingMap) return;
   isFetchingTech = true;
   try{
     const res = await fetch(FB_URL + '/locations.json?t=' + Date.now());
