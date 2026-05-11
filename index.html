@@ -950,6 +950,8 @@ async function fetchTechLocations(){
 
 async function checkTrackingStatus(){
   if(!CURRENT_USER || CURRENT_USER.role !== 'tech') return;
+  // Tampilkan tracking bar dulu sebelum update UI
+  document.getElementById('trackingBar').style.display = 'block';
   const key = CURRENT_USER.techName.replace(/\s+/g,'_');
   try{
     const res = await fetch(`${FB_URL}/locations/${key}.json`);
@@ -974,7 +976,6 @@ async function checkTrackingStatus(){
     isTracking = false;
     updateTrackingUI(false);
   }
-  document.getElementById('trackingBar').style.display = 'block';
 }
 
 function updateTrackingUI(on){
