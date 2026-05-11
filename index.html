@@ -845,7 +845,6 @@ function initMap(){
 let mapInitialFit = false;
 function renderMap(){
   if(!map||!markerLayer)return;
-  // Bikin layer baru dulu, jangan langsung clear yang lama
   const newLayer = L.layerGroup();
   const pts=FILTERED.filter(r=>r.lat&&r.lng);
   pts.forEach(r=>{
@@ -863,18 +862,19 @@ function renderMap(){
         ${r.ops?`<a href="${r.ops}" target="_blank" class="pu-btn" style="background:rgba(34,197,94,0.2);color:#22c55e">⚡ Ops</a>`:''}
       </div>`,{maxWidth:240}).addTo(newLayer);
   });
-  // Swap layer — hapus lama, pasang baru
+  // Swap layer dispatch
   map.removeLayer(markerLayer);
   markerLayer = newLayer;
   markerLayer.addTo(map);
-  // fitBounds hanya sekali saat pertama kali ada data
+  // fitBounds hanya sekali
   if(pts.length && !mapInitialFit){
     const b=L.latLngBounds(pts.map(r=>[r.lat,r.lng]));
     map.fitBounds(b,{padding:[20,20]});
     mapInitialFit = true;
   }
-  // Overlay tech realtime markers
-  fetchTechLocations();
+  // Fetch tech markers setelah dispatch layer selesai dipasang
+  // Pakai setTimeout biar ga bentrok (race condition)
+  setTimeout(()=>{ if(CURRENT_USER) fetchTechLocations(); }, 200);
 }
 
 function goMap(lat,lng,e){
@@ -913,17 +913,20 @@ let techWatchId = null;
 let realtimeInterval = null;
 
 let techLayer = null;
+let isFetchingTech = false;
 async function fetchTechLocations(){
   // Hanya admin yang bisa lihat lokasi teknisi
   if(!CURRENT_USER || CURRENT_USER.role !== 'admin') return;
   if(!map) return;
+  if(isFetchingTech) return; // skip kalau lagi fetch
+  isFetchingTech = true;
   try{
     const res = await fetch(FB_URL + '/locations.json?t=' + Date.now());
     const data = await res.json();
     // Hapus layer lama kalau ada
     if(techLayer){ try{map.removeLayer(techLayer);}catch(e){} }
     techLayer = L.layerGroup().addTo(map);
-    if(!data) return;
+    if(!data){ isFetchingTech = false; return; }
     const now = Date.now();
     Object.entries(data).forEach(([techKey, val]) => {
       if(!val || !val.lat || !val.lng || !val.active) return;
@@ -946,6 +949,7 @@ async function fetchTechLocations(){
         .addTo(techLayer);
     });
   } catch(e){ console.warn('Fetch tech loc error:', e); }
+  finally { isFetchingTech = false; }
 }
 
 async function checkTrackingStatus(){
