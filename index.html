@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Dispatch Today</title>
+<link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" as="style">
+<link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" as="script">
 <style>
 
 :root {
@@ -443,6 +445,8 @@ function applyLogin(){
   if(CURRENT_USER.role === 'tech'){
     document.getElementById('rowTechLoc').style.display = 'none';
   }
+  // Preload Leaflet segera setelah login
+  preloadMap();
   if(CURRENT_USER.role==='tech') checkTrackingStatus();
   loadData();
 }
@@ -886,7 +890,12 @@ function goMap(lat,lng,e){
   });
 }
 
-// Lazy load map on scroll
+// Preload Leaflet segera setelah login, jangan tunggu scroll
+function preloadMap(){
+  if(!mapReady) loadLeaflet(()=>initMap());
+}
+
+// Lazy load map on scroll (fallback kalau preload belum jalan)
 const obs=new IntersectionObserver(entries=>{
   if(entries[0].isIntersecting&&!mapReady){
     loadLeaflet(()=>initMap());
