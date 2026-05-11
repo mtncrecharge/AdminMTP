@@ -964,8 +964,11 @@ function startSendingLocation(){
 
   const sendToFirebase = (lat, lng) => {
     // Simpan koordinat terkini untuk sorting jarak
+    const isFirst = techCurrentLat === null;
     techCurrentLat = lat;
     techCurrentLng = lng;
+    // Kalau ini posisi pertama, langsung re-sort tabel
+    if(isFirst) applyFilter();
     const payload = {
       lat, lng,
       name: CURRENT_USER.techName,
@@ -1047,6 +1050,18 @@ async function startTracking(){
   }
   isTracking = true;
   updateTrackingUI(true);
+  // Ambil posisi GPS sekarang dulu sebelum load data
+  await new Promise(resolve => {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        techCurrentLat = pos.coords.latitude;
+        techCurrentLng = pos.coords.longitude;
+        resolve();
+      },
+      () => resolve(), // tetap lanjut walau GPS error
+      { enableHighAccuracy: true, timeout: 5000 }
+    );
+  });
   startSendingLocation();
   // Reload data + render map langsung
   await loadData(true);
